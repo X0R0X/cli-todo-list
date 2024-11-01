@@ -1,53 +1,139 @@
-use crate::actions::actions::{AddRecordAction, AppAction, ListRecords, PerformAction, PrintHelp, RmRecordAction};
+extern crate argparse;
+
+use std::process::exit;
+use argparse::{ArgumentParser, Store, StoreConst};
+use crate::actions::actions::{
+    add_action,
+    add_action_at_index,
+    list_actions,
+    rm_action,
+    ActionResult
+};
 
 pub mod actions;
+mod config;
 
-fn main() {
-    run()
+#[derive(Clone, Eq, PartialEq, Debug)]
+enum AppMode {
+    Add,
+    AddToStart,
+    Rm,
+    RmFirst,
+    RmLast,
+    ListRecords,
 }
 
-fn run() {
-    let args: Vec<String> = std::env::args().collect();
+#[derive(Clone, Debug)]
+struct AppOptions {
+    mode: AppMode,
+    param: String,
+    position: i64
+}
 
-    let action: AppAction;
-    if args.len() < 2 {
-        action = AppAction::PrintHelp(PrintHelp);
-    } else {
-        if args.len() < 3 {
-            let mode = args[1].as_str();
-            match mode {
-                "-l" | "--list" => {
-                    action = AppAction::ListRecords(ListRecords);
+fn parse_args() -> AppOptions {
+    let mut opts: AppOptions = AppOptions {
+        mode: AppMode::Add,
+        param: "".to_string(),
+        position: -1,
+    };
+
+    {
+        let mut ap = ArgumentParser::new();
+        ap.set_description("Simple CLI Utility to manage a to-do list.");
+
+        ap.refer(&mut opts.mode)
+            .add_option(
+                &["-a", "--add"],
+                StoreConst(AppMode::Add),
+                "Add to-do list record.",
+            )
+            .add_option(
+                &["-s", "--insert"],
+                StoreConst(AppMode::AddToStart),
+                "Add record to the start of the to-do list.",
+            )
+            .add_option(
+                &["-r", "--remove"],
+                StoreConst(AppMode::Rm),
+                "Remove record.",
+            )
+            .add_option(
+                &["-t", "--last"],
+                StoreConst(AppMode::RmLast),
+                "Remove the latest record.",
+            )
+            .add_option(
+                &["-y", "--first"],
+                StoreConst(AppMode::RmFirst),
+                "Remove the first record.",
+            )
+            .add_option(
+                &["-l", "--list"],
+                StoreConst(AppMode::ListRecords),
+                "List records.",
+            );
+
+        ap.refer(&mut opts.param).add_argument(
+            "record_or_index",
+            Store,
+            "To-do list record (Add) or index (Remove).",
+        );
+
+        ap.parse_args_or_exit();
+    }
+
+    if (
+        opts.mode == AppMode::Add || opts.mode == AppMode::Rm) &&
+        opts.param == "" {
+        opts.mode = AppMode::ListRecords;
+    }
+
+    opts
+}
+
+
+fn main() {
+    let opts = parse_args();
+
+    let result: ActionResult = match opts.mode {
+        AppMode::ListRecords => {
+            list_actions()
+        }
+        AppMode::Add => {
+            add_action(opts.param)
+        }
+        AppMode::Rm => {
+            match opts.param.parse() {
+                Ok(val) => {
+                    if val < 1 {
+                        println!(
+                            "Number of item to remove cannot be lesser than 1."
+                        );
+                        ActionResult::UnableToRemoveAction
+                    } else {
+                        rm_action(val)
+                    }
                 }
-                "-h" | "--help" | _ => {
-                    action = AppAction::PrintHelp(PrintHelp);
-                }
-            }
-        } else {
-            let mode = args[1].as_str();
-            let input = args[2].as_str();
-            match mode {
-                "-a" | "--add" => {
-                    action = AppAction::AddRecord(
-                        AddRecordAction::new(String::from(input))
-                    );
-                }
-                "-r" | "--remove" => {
-                    action = AppAction::RmRecord(
-                        RmRecordAction::new(String::from(input))
-                    );
-                }
-                _ => {
-                    action = AppAction::PrintHelp(PrintHelp);
+                Err(_) => {
+                    println!("Expecting parameter number of item to remove.");
+                    exit(1);
                 }
             }
         }
-    }
+        AppMode::AddToStart => {
+            add_action_at_index(opts.param, -100)
+        }
+        AppMode::RmFirst => {
+            rm_action(1)
+        }
+        AppMode::RmLast => {
+            rm_action(-1)
+        }
+    };
 
-    match action {
-        AppAction::PrintHelp(action) => { action.perform(); }
-        AppAction::ListRecords(action) => { action.perform(); }
-        AppAction::AddRecord(action) => { action.perform(); }
-        AppAction::RmRecord(action) => { action.perform(); }
+    if result == ActionResult::Ok {
+        exit(0);
+    } else {
+        exit(1);
     }
 }
