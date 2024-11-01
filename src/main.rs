@@ -121,7 +121,7 @@ fn main() {
             }
         }
         AppMode::AddToStart => {
-            add_action_at_index(opts.param, -100)
+            add_action_at_index(opts.param, 0)
         }
         AppMode::RmFirst => {
             rm_action(1)
