@@ -37,6 +37,7 @@ pub mod actions {
                 println!("{}. {}", i + 1, line);
             }
         }
+
         ActionResult::Ok
     }
 
@@ -97,6 +98,22 @@ pub mod actions {
             }
         } else {
             add_action(action)
+        }
+    }
+
+    pub fn rm_all() -> ActionResult {
+        let fp = get_persistence_file_path();
+
+        if fp.exists() {
+            match fs::remove_file(fp) {
+                Ok(_) => ActionResult::Ok,
+                Err(e) => {
+                    println!("Unable to clear the to-do list: {}", e);
+                    ActionResult::UnableToRemoveAction
+                },
+            }
+        } else {
+            ActionResult::Ok
         }
     }
 

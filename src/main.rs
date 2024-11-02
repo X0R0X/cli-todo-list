@@ -7,6 +7,7 @@ use crate::actions::actions::{
     add_action_at_index,
     list_actions,
     rm_action,
+    rm_all,
     ActionResult
 };
 
@@ -20,20 +21,21 @@ enum AppMode {
     Rm,
     RmFirst,
     RmLast,
+    RmAll,
     ListRecords,
 }
 
 #[derive(Clone, Debug)]
 struct AppOptions {
     mode: AppMode,
-    param: String,
-    position: i64
+    action: String,
+    position: i64,
 }
 
 fn parse_args() -> AppOptions {
     let mut opts: AppOptions = AppOptions {
         mode: AppMode::Add,
-        param: "".to_string(),
+        action: "".to_string(),
         position: -1,
     };
 
@@ -71,20 +73,33 @@ fn parse_args() -> AppOptions {
                 &["-l", "--list"],
                 StoreConst(AppMode::ListRecords),
                 "List records.",
+            )
+            .add_option(
+                &["-C", "--clear"],
+                StoreConst(AppMode::RmAll),
+                "Remove all records.",
             );
 
-        ap.refer(&mut opts.param).add_argument(
-            "record_or_index",
+        ap.refer(&mut opts.action).add_argument(
+            "record_or_position",
             Store,
-            "To-do list record (Add) or index (Remove).",
+            "To-do list record (Add) or position (Remove).",
+        );
+
+        ap.refer(&mut opts.position).add_argument(
+            "position",
+            Store,
+            "To-do list record position, may be used with -a",
         );
 
         ap.parse_args_or_exit();
     }
 
     if (
-        opts.mode == AppMode::Add || opts.mode == AppMode::Rm) &&
-        opts.param == "" {
+        opts.mode == AppMode::Add ||
+            opts.mode == AppMode::Rm ||
+            opts.mode == AppMode::AddToStart
+    ) && opts.action == "" {
         opts.mode = AppMode::ListRecords;
     }
 
@@ -100,10 +115,17 @@ fn main() {
             list_actions()
         }
         AppMode::Add => {
-            add_action(opts.param)
+            if opts.position == -1 {
+                add_action(opts.action)
+            } else {
+                add_action_at_index(opts.action, opts.position - 1)
+            }
+        }
+        AppMode::AddToStart => {
+            add_action_at_index(opts.action, 0)
         }
         AppMode::Rm => {
-            match opts.param.parse() {
+            match opts.action.parse() {
                 Ok(val) => {
                     if val < 1 {
                         println!(
@@ -120,14 +142,14 @@ fn main() {
                 }
             }
         }
-        AppMode::AddToStart => {
-            add_action_at_index(opts.param, 0)
-        }
         AppMode::RmFirst => {
             rm_action(1)
         }
         AppMode::RmLast => {
             rm_action(-1)
+        }
+        AppMode::RmAll => {
+            rm_all()
         }
     };
 
