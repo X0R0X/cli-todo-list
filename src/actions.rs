@@ -4,6 +4,7 @@ pub mod actions {
     use std::{fs, io};
     use std::io::{Write};
     use std::path::PathBuf;
+    use std::str::Lines;
     use crate::config::config::get_persistence_file_path;
 
     #[derive(Eq, PartialEq)]
@@ -12,6 +13,9 @@ pub mod actions {
         UnableToAddAction,
         UnableToRemoveAction,
     }
+
+    const EMPTY_TODO_STR: &str = "There are no records in todo list. \
+    Use -h switch to see usage.";
 
     fn load_file_to_vec(fp: &PathBuf) -> Vec<String> {
         fs::read_to_string(&fp)
@@ -28,14 +32,62 @@ pub mod actions {
         )
     }
 
+    fn print_list_empty() {
+        println!("{}", EMPTY_TODO_STR);
+    }
+
+    fn print_header(lines: Option<Lines>) {
+        let mut max_len: usize = 0;
+        let s: String;
+        let s_title: &str = "To-Do List";
+
+
+        match lines {
+            Some(lines) => {
+                for line in lines {
+                    let len = line.len();
+                    if len + 3 > max_len {
+                        max_len = len + 3;
+                    }
+                }
+
+                if max_len > s_title.len() + 4{
+                    s = "-".repeat(max_len);
+
+                } else {
+                    s = "-".repeat(s_title.len() + 4);
+                }
+            }
+            None => {
+                s = "-".repeat(EMPTY_TODO_STR.len());
+            }
+        }
+
+        let l = (s.len() - s_title.len()) / 2 - 2;
+        let s2s = " ".repeat(l);
+
+        println!("{}", s);
+        println!("|  {}TO-DO List{}   |", s2s, s2s);
+        println!("{}", s);
+    }
+
     pub fn list_actions() -> ActionResult {
         let fp = get_persistence_file_path();
 
         if fp.exists() {
             let f = fs::read_to_string(&fp).unwrap();
-            for (i, line) in f.lines().enumerate() {
+
+            let iterator = f.lines();
+
+            print_header(Some(iterator.clone()));
+
+            for (i, line) in iterator.enumerate() {
                 println!("{}. {}", i + 1, line);
             }
+        } else {
+            print_header(None);
+
+            print_list_empty()
         }
 
         ActionResult::Ok
@@ -110,7 +162,7 @@ pub mod actions {
                 Err(e) => {
                     println!("Unable to clear the to-do list: {}", e);
                     ActionResult::UnableToRemoveAction
-                },
+                }
             }
         } else {
             ActionResult::Ok
